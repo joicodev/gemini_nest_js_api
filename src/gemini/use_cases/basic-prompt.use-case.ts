@@ -16,7 +16,6 @@ export const basicPromptUseCase = async (
     systemInstruction = `
     Response unicamente en español.
     Usa el formato markdown.
-    Dame una frase motivacional al final de cada mensaje.
     `,
   } = options ?? {};
 
