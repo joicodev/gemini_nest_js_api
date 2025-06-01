@@ -59,13 +59,17 @@ jobs:
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
-          
+
+          # Set the remote manually
+          git remote add origin https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/joicodev/orion_gem_dart_client.git
+          git fetch origin
+
           if git ls-remote --exit-code --heads origin auto/develop; then
-            git checkout auto/develop
+            git checkout -B auto/develop origin/auto/develop
           else
             git checkout -b auto/develop
           fi
-          
+
           git add .
           git commit -m "🔄 Auto-generated SDK update from Nest API"
           git push origin auto/develop
