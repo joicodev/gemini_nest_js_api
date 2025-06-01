@@ -4,96 +4,163 @@ on:
   push:
     branches:
       - develop
+  workflow_dispatch:
 
 jobs:
   generate-sdk:
-    name: ♻️ Generate Dart SDK
     runs-on: ubuntu-latest
 
     steps:
-      - name: ⬇️ Checkout API repo
-        uses: actions/checkout@v3
+      - name: ⬇️ Checkout Dart SDK repo
+        uses: actions/checkout@v4
+        with:
+          path: dart_sdk
 
-      - name: ⚙️ Install Node.js
+      - name: ⬇️ Checkout NestJS API repo
+        uses: actions/checkout@v4
+        with:
+          repository: joicodev/orion_gem_nest_api
+          path: backend
+
+      - name: 🟢 Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: '20'
 
-      - name: 📦 Install OpenAPI Generator CLI
-        run: npm install @openapitools/openapi-generator-cli -g
+      - name: 📦 Install backend dependencies
+        working-directory: backend
+        run: npm ci
 
-      - name: 🧪 Clone SDK repo
+      - name: 🚀 Run NestJS API in background
+        working-directory: backend
         run: |
-          git clone https://github.com/joicodev/orion_gem_dart_client.git
-          cd orion_gem_dart_client
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          npm run start:dev &
+          echo "⏳ Waiting for API to be ready..."
+          # Wait for up to 60 seconds (30 attempts * 2 seconds)
+          for i in {1..30}; do
+            if curl -s --fail http://localhost:3000/api-json > /dev/null; then
+              echo "✅ API is up!"
+              break
+            elif [ $i -eq 30 ]; then
+              echo "❌ API did not start in time."
+              # Optionally, dump logs or take other actions
+              # For example, to see backend logs if it wrote to a file:
+              # cat backend/api.log || echo "No backend log file found."
+              exit 1
+            fi
+            sleep 2
+          done
 
-      - name: 🧹 Clean previous SDK
+      - name: 💾 Extract version from pubspec.yaml or default
+        id: get_version
+        working-directory: dart_sdk
         run: |
-          cd orion_gem_dart_client
-          rm -rf lib test doc .openapi-generator .openapi-generator-ignore
-
-      - name: 🔢 Read & bump version from pubspec.yaml
-        id: versioning
-        run: |
-          cd orion_gem_dart_client
-          if [ -f "pubspec.yaml" ]; then
-            version=$(grep '^version:' pubspec.yaml | cut -d ' ' -f2)
-            echo "🟢 Found version: $version"
-            major=$(echo $version | cut -d. -f1)
-            minor=$(echo $version | cut -d. -f2)
-            patch=$(echo $version | cut -d. -f3)
-            new_patch=$((patch + 1))
-            new_version="$major.$minor.$new_patch"
-            sed -i "s/^version: .*/version: $new_version/" pubspec.yaml
+          # Ensure pubspec.yaml exists, if not, generator will create it.
+          # If it exists and is empty or malformed, grep might fail.
+          # Defaulting to 1.0.0 if version line not found.
+          if [ -f pubspec.yaml ]; then
+            VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}' || echo "1.0.0")
           else
-            echo "version: 1.0.0" > pubspec.yaml
-            new_version="1.0.0"
+            # If pubspec.yaml doesn't exist yet (e.g., after clean), use default.
+            # The generator will create a pubspec.yaml with a version,
+            # but this step might run before generation if reordered,
+            # or if we want a version *before* generation for some reason.
+            # Given current order, this runs on the *old* pubspec.yaml.
+            # The openapi-generator also takes a pubVersion parameter.
+            # It might be better to define the version once.
+            VERSION="1.0.0" # Default version
           fi
-          echo "version=$new_version" >> $GITHUB_OUTPUT
+          echo "Extracted/default version: $VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: 🚀 Generate SDK from Swagger
+      - name: 🧹 Clean old SDK files
+        working-directory: dart_sdk
         run: |
+          # Be careful with rm -rf. This removes everything in dart_sdk except .git
+          # If dart_sdk is the root of the repo being checked out, this is too aggressive.
+          # Assuming dart_sdk is a dedicated path for generated SDK files.
+          # The checkout path is 'dart_sdk', so this cleans within that path.
+          rm -rf lib doc test pubspec.yaml .openapi-generator .openapi-generator-ignore openapi-docs
+
+      - name: ⚙️ Generate Dart SDK
+        working-directory: dart_sdk
+        run: |
+          # Consider using npx to avoid global install or manage tool versions better
+          npm install -g @openapitools/openapi-generator-cli
           openapi-generator-cli generate \
             -g dart-dio \
             -i http://localhost:3000/api-json \
-            -o orion_gem_dart_client \
-            --additional-properties=pubName=orion_gem_dart_client,pubVersion=${{ steps.versioning.outputs.version }},serializationLibrary=built_value,buildRunner=true,useEnumExtension=true
+            -o . \
+            --additional-properties=pubName=orion_gem_dart_client,pubVersion=${{ steps.get_version.outputs.version }},serializationLibrary=built_value,buildRunner=true,useEnumExtension=true
 
       - name: 🐦 Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.22.0'
+          flutter-version: '3.22.0' # As you specified. Consider using a channel like 'stable' for easier maintenance.
+          # channel: 'stable' # Example if you prefer channel over specific version
+          # cache: true # Optional: to cache Flutter SDK for faster subsequent runs
 
       - name: 📦 Generate .g.dart files
-        working-directory: orion_gem_dart_client
+        working-directory: dart_sdk # Corrected: This must be where pubspec.yaml of the generated client is
         run: |
           flutter pub get
           flutter pub run build_runner build --delete-conflicting-outputs
 
-      - name: 📤 Commit & push to SDK repo
+      - name: 🆕 Create SDK branch and commit
+        working-directory: dart_sdk
         run: |
-          cd orion_gem_dart_client
-          git checkout -b update/sdk-${{ steps.versioning.outputs.version }}
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          BRANCH_NAME="auto/sdk-update-v${{ steps.get_version.outputs.version }}"
+          git checkout -B "$BRANCH_NAME" # Use -B to create or reset branch
           git add .
-          git commit -m "🤖 SDK updated to version ${{ steps.versioning.outputs.version }}"
-          git push origin update/sdk-${{ steps.versioning.outputs.version }}
+          # Check if there are any changes to commit
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "🔄 Auto SDK update (v${{ steps.get_version.outputs.version }})"
+            git push origin "$BRANCH_NAME" --force # Use --force if branch may exist and need overwrite
+          fi
 
-      - name: 🔀 Create Pull Request
-        uses: peter-evans/create-pull-request@v5
+      - name: 🚀 Create Pull Request
+        uses: peter-evans/create-pull-request@v6 # Updated to v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "🤖 SDK auto-generated: version ${{ steps.versioning.outputs.version }}"
-          branch: update/sdk-${{ steps.versioning.outputs.version }}
-          base: main
-          title: "Auto SDK update to v${{ steps.versioning.outputs.version }}"
-          body: "This PR was auto-generated by the GitHub Action to update the Dart SDK."
-          labels: auto-generated, sdk
+          # path: dart_sdk # Not needed if commits are already in dart_sdk working directory and pushed
+          commit-message: "chore(sdk): Auto-generated Dart client v${{ steps.get_version.outputs.version }}" # Conventional commit style
+          committer: "github-actions[bot] <github-actions[bot]@users.noreply.github.com>"
+          author: "github-actions[bot] <github-actions[bot]@users.noreply.github.com>"
+          branch: auto/sdk-update-v${{ steps.get_version.outputs.version }}
+          base: main # Or your default branch, e.g., develop
+          delete-branch: true # Optional: delete the branch after PR is merged/closed
+          title: "🤖 SDK: Auto-generated update v${{ steps.get_version.outputs.version }}"
+          body: |
+            This PR contains the auto-generated Dart client for Orion GEM API.
+
+            **Version:** `${{ steps.get_version.outputs.version }}`
+
+            <sub>Generated by GitHub Actions 🤖</sub>
+          labels: |
+            sdk
+            auto-generated
+            version:${{ steps.get_version.outputs.version }}
           draft: false
 
-      - name: 🔖 Create Tag
+      - name: 🏷️ Create and push tag
+        # This step should ideally run only after the PR is merged,
+        # or on a separate workflow triggered by merge to main/release.
+        # Running it here means the tag is created regardless of PR status.
+        # If that's intended, it's fine.
+        if: github.ref == 'refs/heads/develop' # Example: only tag on pushes to develop
+        working-directory: dart_sdk # Ensure git commands run in the correct repository context
         run: |
-          cd orion_gem_dart_client
-          git tag sdk-v${{ steps.versioning.outputs.version }}
-          git push origin sdk-v${{ steps.versioning.outputs.version }}
+          TAG_NAME="v${{ steps.get_version.outputs.version }}"
+          echo "Attempting to create and push tag: $TAG_NAME"
+          # Check if tag already exists locally or remotely to avoid errors
+          if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
+            echo "Tag $TAG_NAME already exists locally."
+          else
+            git tag "$TAG_NAME"
+            git push origin "$TAG_NAME"
+            echo "Tag $TAG_NAME created and pushed."
+          fi
