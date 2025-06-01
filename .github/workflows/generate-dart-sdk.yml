@@ -17,7 +17,7 @@ jobs:
       - name: ⚙️ Install Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
 
       - name: 📦 Install OpenAPI Generator CLI
         run: npm install @openapitools/openapi-generator-cli -g
