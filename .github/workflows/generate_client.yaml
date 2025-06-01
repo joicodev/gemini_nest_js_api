@@ -1,0 +1,71 @@
+name: Generate Dart Client SDK
+
+on:
+  push:
+    branches:
+      - develop
+
+jobs:
+  generate-client:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: 🧪 Checkout Nest API Repository
+        uses: actions/checkout@v3
+
+      - name: 🛠️ Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: 🧩 Install API Dependencies
+        run: npm install
+
+      - name: 🚀 Start Nest API in Background
+        run: |
+          nohup npm run start:dev &
+
+      - name: ⏱️ Wait for Swagger to be Ready
+        run: |
+          until curl --output /dev/null --silent --head --fail http://localhost:3000/api-json; do
+            echo "Waiting for Swagger..."
+            sleep 5
+          done
+
+      - name: 🧬 Clone Dart Client Repo
+        uses: actions/checkout@v3
+        with:
+          repository: joicodev/orion_gem_dart_client
+          token: ${{ secrets.PAT_GITHUB }}
+          path: dart_client
+
+      - name: 🐹 Setup Dart
+        uses: dart-lang/setup-dart@v1
+
+      - name: ⚙️ Install openapi-generator-cli
+        run: npm install -g @openapitools/openapi-generator-cli
+
+      - name: ✅ Make script executable
+        working-directory: dart_client
+        run: chmod +x client_generator.sh
+
+      - name: ⚙️ Run client_generator.sh
+        working-directory: dart_client
+        run: ./client_generator.sh
+
+      - name: 📝 Commit & Push to auto/develop
+        working-directory: dart_client
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          
+          if git ls-remote --exit-code --heads origin auto/develop; then
+            git checkout auto/develop
+          else
+            git checkout -b auto/develop
+          fi
+          
+          git add .
+          git commit -m "🔄 Auto-generated SDK update from Nest API"
+          git push origin auto/develop
