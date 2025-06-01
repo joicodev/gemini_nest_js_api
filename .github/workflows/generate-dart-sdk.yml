@@ -1,4 +1,4 @@
-name: Generate Dart SDK on Merge to Develop
+name: Generate Dart SDK
 
 on:
   push:
@@ -6,84 +6,87 @@ on:
       - develop
 
 jobs:
-  generate-client:
+  generate-sdk:
     runs-on: ubuntu-latest
 
     env:
-      CLIENT_REPO: joicodev/orion_gem_dart_client
-      CLIENT_BRANCH: auto/sdk-update
-      SDK_OUTPUT_DIR: sdk-output
-      SWAGGER_URL: http://localhost:3000/api-json
+      SDK_REPO: joicodev/orion_gem_dart_client
+      SDK_REPO_CLONE_NAME: orion_gem_dart_client
+      SDK_OUTPUT_DIR: orion_gem_dart_client
+      NEST_API_URL: http://localhost:3000/api-json
+      PACKAGE_NAME: orion_gem_dart_client
 
     steps:
-      - name: Checkout backend repo
-        uses: actions/checkout@v3
+      - name: ⬇️ Checkout backend repo
+        uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
+      - name: ⬇️ Checkout SDK repo
+        uses: actions/checkout@v4
         with:
-          node-version: '18'
+          repository: ${{ env.SDK_REPO }}
+          path: ${{ env.SDK_OUTPUT_DIR }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install openapi-generator-cli
-        run: npm install @openapitools/openapi-generator-cli -g
-
-      - name: Start NestJS app (for Swagger)
+      - name: ⚙️ Install dependencies
         run: |
-          npm install
-          npm run build &
-          npm run start:dev &
-          sleep 10  # Espera a que inicie
+          npm install -g @openapitools/openapi-generator-cli
+          sudo apt-get update
+          sudo apt-get install -y curl unzip
 
-      - name: Generate SDK to temp folder
+      - name: 🧹 Clean old SDK
+        working-directory: ${{ env.SDK_OUTPUT_DIR }}
         run: |
-          mkdir ${{ env.SDK_OUTPUT_DIR }}
+          echo "🧹 Removing old generated files"
+          rm -rf lib doc test .openapi-generator .openapi-generator-ignore pubspec.yaml
+
+      - name: 🚀 Generate Dart SDK
+        run: |
           openapi-generator-cli generate \
             -g dart-dio \
-            -i ${{ env.SWAGGER_URL }} \
+            -i ${{ env.NEST_API_URL }} \
             -o ${{ env.SDK_OUTPUT_DIR }} \
-            --additional-properties=pubName=orion_gem_dart_client,pubVersion=1.0.0,serializationLibrary=built_value,buildRunner=true,useEnumExtension=true
+            --additional-properties=pubName=${{ env.PACKAGE_NAME }},serializationLibrary=built_value,buildRunner=true,useEnumExtension=true
 
-      - name: Checkout Dart client repo
-        uses: actions/checkout@v3
-        with:
-          repository: ${{ env.CLIENT_REPO }}
-          token: ${{ secrets.GH_TOKEN }}
-          path: dart_client
-
-      - name: Copy generated SDK
+      - name: 📦 Bump patch version in pubspec.yaml
+        working-directory: ${{ env.SDK_OUTPUT_DIR }}
         run: |
-          rm -rf dart_client/lib dart_client/test dart_client/doc
-          cp -r ${{ env.SDK_OUTPUT_DIR }}/lib dart_client/
-          cp -r ${{ env.SDK_OUTPUT_DIR }}/test dart_client/
-          cp -r ${{ env.SDK_OUTPUT_DIR }}/doc dart_client/
-          cp ${{ env.SDK_OUTPUT_DIR }}/pubspec.yaml dart_client/
+          echo "📦 Reading current version from pubspec.yaml..."
+          VERSION_LINE=$(grep '^version:' pubspec.yaml)
+          CURRENT_VERSION=$(echo $VERSION_LINE | awk '{print $2}')
+          echo "🔍 Current version: $CURRENT_VERSION"
 
-      - name: Set up Dart
-        uses: dart-lang/setup-dart@v1
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+          PATCH=$((PATCH + 1))
+          NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+          echo "🚀 Bumping version to: $NEW_VERSION"
 
-      - name: Install Dart dependencies and run build_runner
-        working-directory: dart_client
+          sed -i.bak "s/^version: .*/version: $NEW_VERSION/" pubspec.yaml
+          cat pubspec.yaml
+
+      - name: 🧪 (Optional) Run Dart codegen
+        working-directory: ${{ env.SDK_OUTPUT_DIR }}
         run: |
           dart pub get
-          dart run build_runner build --delete-conflicting-outputs
+          dart run build_runner build --delete-conflicting-outputs || true
 
-      - name: Create new branch and commit
-        working-directory: dart_client
+      - name: 📂 Create SDK commit
+        working-directory: ${{ env.SDK_OUTPUT_DIR }}
         run: |
-          git config user.name "github-actions"
-          git config user.email "actions@github.com"
-          git checkout -b ${{ env.CLIENT_BRANCH }}
+          git config user.name "GitHub Action"
+          git config user.email "action@github.com"
+          BRANCH_NAME=sdk/update-$(date +%s)
+          git checkout -b $BRANCH_NAME
           git add .
-          git commit -m "🤖 Auto-generated SDK update from backend changes"
-          git push origin ${{ env.CLIENT_BRANCH }} --force
+          git commit -m "🤖 Auto-generated Dart SDK update"
+          git push origin $BRANCH_NAME
+          echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
 
-      - name: Create Pull Request to main
-        uses: peter-evans/create-pull-request@v5
+      - name: 📬 Create PR to SDK repo
+        uses: peter-evans/create-pull-request@v6
         with:
-          token: ${{ secrets.GH_TOKEN }}
-          path: dart_client
-          commit-message: "Auto-generated Dart SDK update"
-          title: "Auto SDK Update from backend develop"
-          body: "This PR includes updated Dart SDK generated from the latest changes merged into develop."
-          branch: ${{ env.CLIENT_BRANCH }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: 🤖 Auto-generated Dart SDK update
+          branch: ${{ env.BRANCH_NAME }}
+          title: "SDK Update - Auto-generated"
           base: main
+          path: ${{ env.SDK_OUTPUT_DIR }}
