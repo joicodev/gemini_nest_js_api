@@ -4,99 +4,96 @@ on:
   push:
     branches:
       - develop
-  workflow_dispatch:
 
 jobs:
   generate-sdk:
+    name: ♻️ Generate Dart SDK
     runs-on: ubuntu-latest
 
     steps:
-      - name: ⬇️ Checkout Dart SDK repo
-        uses: actions/checkout@v4
-        with:
-          path: dart_sdk
+      - name: ⬇️ Checkout API repo
+        uses: actions/checkout@v3
 
-      - name: ⬇️ Checkout NestJS API repo
-        uses: actions/checkout@v4
-        with:
-          repository: joicodev/orion_gem_nest_api
-          path: backend
-
-      - name: 🟢 Setup Node.js
+      - name: ⚙️ Install Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: 18
 
-      - name: 📦 Install backend dependencies
-        working-directory: backend
-        run: npm ci
+      - name: 📦 Install OpenAPI Generator CLI
+        run: npm install @openapitools/openapi-generator-cli -g
 
-      - name: 🚀 Run NestJS API in background
-        working-directory: backend
+      - name: 🧪 Clone SDK repo
         run: |
-          npm run start:dev &
-          echo "⏳ Waiting for API to be ready..."
-          for i in {1..30}; do
-            if curl -s http://localhost:3000/api-json > /dev/null; then
-              echo "✅ API is up!"
-              break
-            fi
-            sleep 2
-          done
+          git clone https://github.com/joicodev/orion_gem_dart_client.git
+          cd orion_gem_dart_client
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: 💾 Extract version from pubspec.yaml or default
-        id: get_version
-        working-directory: dart_sdk
+      - name: 🧹 Clean previous SDK
         run: |
-          VERSION=$(grep '^version:' pubspec.yaml | cut -d ' ' -f2 || echo "1.0.0")
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          cd orion_gem_dart_client
+          rm -rf lib test doc .openapi-generator .openapi-generator-ignore
 
-      - name: 🧹 Clean old SDK files
-        working-directory: dart_sdk
-        run: rm -rf lib doc test pubspec.yaml .openapi-generator .openapi-generator-ignore
-
-      - name: ⚙️ Generate Dart SDK
-        working-directory: dart_sdk
+      - name: 🔢 Read & bump version from pubspec.yaml
+        id: versioning
         run: |
-          npm install -g @openapitools/openapi-generator-cli
+          cd orion_gem_dart_client
+          if [ -f "pubspec.yaml" ]; then
+            version=$(grep '^version:' pubspec.yaml | cut -d ' ' -f2)
+            echo "🟢 Found version: $version"
+            major=$(echo $version | cut -d. -f1)
+            minor=$(echo $version | cut -d. -f2)
+            patch=$(echo $version | cut -d. -f3)
+            new_patch=$((patch + 1))
+            new_version="$major.$minor.$new_patch"
+            sed -i "s/^version: .*/version: $new_version/" pubspec.yaml
+          else
+            echo "version: 1.0.0" > pubspec.yaml
+            new_version="1.0.0"
+          fi
+          echo "version=$new_version" >> $GITHUB_OUTPUT
+
+      - name: 🚀 Generate SDK from Swagger
+        run: |
           openapi-generator-cli generate \
             -g dart-dio \
             -i http://localhost:3000/api-json \
-            -o . \
-            --additional-properties=pubName=orion_gem_dart_client,pubVersion=${{ steps.get_version.outputs.version }},serializationLibrary=built_value,buildRunner=true,useEnumExtension=true
+            -o orion_gem_dart_client \
+            --additional-properties=pubName=orion_gem_dart_client,pubVersion=${{ steps.versioning.outputs.version }},serializationLibrary=built_value,buildRunner=true,useEnumExtension=true
 
-      - name: 🛠️ Run build_runner
-        working-directory: dart_sdk
-        run: |
-          dart pub get
-          dart run build_runner build --delete-conflicting-outputs
+      - name: 🐦 Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.0'
 
-      - name: 🆕 Create SDK branch
-        working-directory: dart_sdk
+      - name: 📦 Generate .g.dart files
+        working-directory: orion_gem_dart_client
         run: |
-          git config user.name "GitHub Action"
-          git config user.email "actions@github.com"
-          git checkout -b auto/sdk-update-${{ steps.get_version.outputs.version }}
+          flutter pub get
+          flutter pub run build_runner build --delete-conflicting-outputs
+
+      - name: 📤 Commit & push to SDK repo
+        run: |
+          cd orion_gem_dart_client
+          git checkout -b update/sdk-${{ steps.versioning.outputs.version }}
           git add .
-          git commit -m "🔄 Auto SDK update (v${{ steps.get_version.outputs.version }})"
-          git push origin auto/sdk-update-${{ steps.get_version.outputs.version }}
+          git commit -m "🤖 SDK updated to version ${{ steps.versioning.outputs.version }}"
+          git push origin update/sdk-${{ steps.versioning.outputs.version }}
 
-      - name: 🚀 Create Pull Request
+      - name: 🔀 Create Pull Request
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          path: dart_sdk
-          commit-message: "🔄 Auto SDK update (v${{ steps.get_version.outputs.version }})"
-          branch: auto/sdk-update-${{ steps.get_version.outputs.version }}
-          title: "SDK: Auto-generated update (v${{ steps.get_version.outputs.version }})"
-          body: |
-            This PR contains the auto-generated Dart client for Orion GEM API.
-            Version: `${{ steps.get_version.outputs.version }}`
-          labels: sdk, auto-generated
+          commit-message: "🤖 SDK auto-generated: version ${{ steps.versioning.outputs.version }}"
+          branch: update/sdk-${{ steps.versioning.outputs.version }}
           base: main
+          title: "Auto SDK update to v${{ steps.versioning.outputs.version }}"
+          body: "This PR was auto-generated by the GitHub Action to update the Dart SDK."
+          labels: auto-generated, sdk
+          draft: false
 
-      - name: 🏷️ Create tag
-        working-directory: dart_sdk
+      - name: 🔖 Create Tag
         run: |
-          git tag v${{ steps.get_version.outputs.version }}
-          git push origin v${{ steps.get_version.outputs.version }}
+          cd orion_gem_dart_client
+          git tag sdk-v${{ steps.versioning.outputs.version }}
+          git push origin sdk-v${{ steps.versioning.outputs.version }}
