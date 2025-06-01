@@ -1,9 +1,9 @@
-name: Generate Dart SDK
+name: Generate Dart SDK for joicodev/orion_gem_dart_client
 
 on:
   push:
     branches:
-      - develop
+      - develop # This is the trigger branch in the repo where this workflow file lives
   workflow_dispatch:
 
 jobs:
@@ -11,81 +11,72 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: ⬇️ Checkout Dart SDK repo
+      # Step 1: Checkout the target SDK repository (joicodev/orion_gem_dart_client)
+      - name: ⬇️ Checkout Dart SDK target repo (joicodev/orion_gem_dart_client)
         uses: actions/checkout@v4
         with:
-          path: dart_sdk
+          repository: joicodev/orion_gem_dart_client
+          path: sdk_target_repo # Local path where the SDK repo will be checked out
+          token: ${{ secrets.SDK_REPO_PAT }} # PAT with write access to joicodev/orion_gem_dart_client
+          # ref: 'main' # Or 'develop', specify the branch to checkout if not the default
 
+      # Step 2: Checkout the NestJS API repository
       - name: ⬇️ Checkout NestJS API repo
         uses: actions/checkout@v4
         with:
-          repository: joicodev/orion_gem_nest_api
-          path: backend
+          repository: joicodev/orion_gem_nest_api # Assuming this is the correct API repo
+          path: backend # Local path for the API backend
 
+      # Step 3: Setup Node.js for the backend
       - name: 🟢 Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
+      # Step 4: Install backend dependencies
       - name: 📦 Install backend dependencies
         working-directory: backend
         run: npm ci
 
+      # Step 5: Run NestJS API in background
       - name: 🚀 Run NestJS API in background
         working-directory: backend
         run: |
           npm run start:dev &
           echo "⏳ Waiting for API to be ready..."
-          # Wait for up to 60 seconds (30 attempts * 2 seconds)
           for i in {1..30}; do
             if curl -s --fail http://localhost:3000/api-json > /dev/null; then
               echo "✅ API is up!"
               break
             elif [ $i -eq 30 ]; then
               echo "❌ API did not start in time."
-              # Optionally, dump logs or take other actions
-              # For example, to see backend logs if it wrote to a file:
-              # cat backend/api.log || echo "No backend log file found."
               exit 1
             fi
             sleep 2
           done
 
-      - name: 💾 Extract version from pubspec.yaml or default
+      # Step 6: Extract version from the SDK target repo's pubspec.yaml or use default
+      - name: 💾 Extract version from SDK target repo or default
         id: get_version
-        working-directory: dart_sdk
+        working-directory: sdk_target_repo # Operate on the checked-out SDK target repo
         run: |
-          # Ensure pubspec.yaml exists, if not, generator will create it.
-          # If it exists and is empty or malformed, grep might fail.
-          # Defaulting to 1.0.0 if version line not found.
           if [ -f pubspec.yaml ]; then
             VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}' || echo "1.0.0")
           else
-            # If pubspec.yaml doesn't exist yet (e.g., after clean), use default.
-            # The generator will create a pubspec.yaml with a version,
-            # but this step might run before generation if reordered,
-            # or if we want a version *before* generation for some reason.
-            # Given current order, this runs on the *old* pubspec.yaml.
-            # The openapi-generator also takes a pubVersion parameter.
-            # It might be better to define the version once.
-            VERSION="1.0.0" # Default version
+            VERSION="1.0.0" # Default if no pubspec.yaml (e.g., first run)
           fi
-          echo "Extracted/default version: $VERSION"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "SDK current/default version: $VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT" # This version will be used by openapi-generator
 
-      - name: 🧹 Clean old SDK files
-        working-directory: dart_sdk
-        run: |
-          # Be careful with rm -rf. This removes everything in dart_sdk except .git
-          # If dart_sdk is the root of the repo being checked out, this is too aggressive.
-          # Assuming dart_sdk is a dedicated path for generated SDK files.
-          # The checkout path is 'dart_sdk', so this cleans within that path.
-          rm -rf lib doc test pubspec.yaml .openapi-generator .openapi-generator-ignore openapi-docs
+      # Step 7: Clean old SDK files in the SDK target repo
+      - name: 🧹 Clean old SDK files in SDK target repo
+        working-directory: sdk_target_repo # Operate on the checked-out SDK target repo
+        run: rm -rf lib doc test pubspec.yaml .openapi-generator .openapi-generator-ignore openapi-docs
 
+      # Step 8: Generate Dart SDK into the SDK target repo
       - name: ⚙️ Generate Dart SDK
-        working-directory: dart_sdk
+        working-directory: sdk_target_repo # Operate on the checked-out SDK target repo
         run: |
-          # Consider using npx to avoid global install or manage tool versions better
           npm install -g @openapitools/openapi-generator-cli
           openapi-generator-cli generate \
             -g dart-dio \
@@ -93,47 +84,52 @@ jobs:
             -o . \
             --additional-properties=pubName=orion_gem_dart_client,pubVersion=${{ steps.get_version.outputs.version }},serializationLibrary=built_value,buildRunner=true,useEnumExtension=true
 
+      # Step 9: Setup Flutter (for build_runner)
       - name: 🐦 Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.22.0' # As you specified. Consider using a channel like 'stable' for easier maintenance.
-          # channel: 'stable' # Example if you prefer channel over specific version
-          # cache: true # Optional: to cache Flutter SDK for faster subsequent runs
+          flutter-version: '3.22.0'
+          # cache: true
 
-      - name: 📦 Generate .g.dart files
-        working-directory: dart_sdk # Corrected: This must be where pubspec.yaml of the generated client is
+      # Step 10: Run build_runner in the SDK target repo
+      - name: 📦 Generate .g.dart files in SDK target repo
+        working-directory: sdk_target_repo # Operate on the checked-out SDK target repo
         run: |
           flutter pub get
           flutter pub run build_runner build --delete-conflicting-outputs
 
-      - name: 🆕 Create SDK branch and commit
-        working-directory: dart_sdk
+      # Step 11: Create SDK branch, commit, and push to joicodev/orion_gem_dart_client
+      - name: 🆕 Create SDK branch and commit to SDK target repo
+        working-directory: sdk_target_repo # Operate on the checked-out SDK target repo
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           BRANCH_NAME="auto/sdk-update-v${{ steps.get_version.outputs.version }}"
-          git checkout -B "$BRANCH_NAME" # Use -B to create or reset branch
+          git checkout -B "$BRANCH_NAME"
           git add .
-          # Check if there are any changes to commit
           if git diff --staged --quiet; then
-            echo "No changes to commit."
+            echo "No changes to commit to SDK target repo."
           else
-            git commit -m "🔄 Auto SDK update (v${{ steps.get_version.outputs.version }})"
-            git push origin "$BRANCH_NAME" --force # Use --force if branch may exist and need overwrite
+            git commit -m "feat: Auto-generate SDK v${{ steps.get_version.outputs.version }}"
+            # This push goes to the 'origin' of sdk_target_repo,
+            # which is joicodev/orion_gem_dart_client due to the checkout with PAT
+            git push origin "$BRANCH_NAME" --force
+            echo "Pushed changes to branch $BRANCH_NAME in joicodev/orion_gem_dart_client"
           fi
 
-      - name: 🚀 Create Pull Request
-        uses: peter-evans/create-pull-request@v6 # Updated to v6
+      # Step 12: Create Pull Request in joicodev/orion_gem_dart_client
+      - name: 🚀 Create Pull Request in SDK Repo
+        uses: peter-evans/create-pull-request@v6
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          # path: dart_sdk # Not needed if commits are already in dart_sdk working directory and pushed
-          commit-message: "chore(sdk): Auto-generated Dart client v${{ steps.get_version.outputs.version }}" # Conventional commit style
+          token: ${{ secrets.SDK_REPO_PAT }} # Use the PAT with access to joicodev/orion_gem_dart_client
+          repository: joicodev/orion_gem_dart_client # Explicitly target this repository for the PR
+          # 'path' is not needed here as commits are already pushed to the branch in the target repo
+          branch: auto/sdk-update-v${{ steps.get_version.outputs.version }} # The branch that was just pushed
+          base: main # Or 'develop', the base branch in joicodev/orion_gem_dart_client
+          delete-branch: true # Optional: delete the auto-generated branch after PR merge/close
+          title: "🤖 SDK: Auto-generated update v${{ steps.get_version.outputs.version }}"
           committer: "github-actions[bot] <github-actions[bot]@users.noreply.github.com>"
           author: "github-actions[bot] <github-actions[bot]@users.noreply.github.com>"
-          branch: auto/sdk-update-v${{ steps.get_version.outputs.version }}
-          base: main # Or your default branch, e.g., develop
-          delete-branch: true # Optional: delete the branch after PR is merged/closed
-          title: "🤖 SDK: Auto-generated update v${{ steps.get_version.outputs.version }}"
           body: |
             This PR contains the auto-generated Dart client for Orion GEM API.
 
@@ -146,21 +142,28 @@ jobs:
             version:${{ steps.get_version.outputs.version }}
           draft: false
 
-      - name: 🏷️ Create and push tag
-        # This step should ideally run only after the PR is merged,
-        # or on a separate workflow triggered by merge to main/release.
-        # Running it here means the tag is created regardless of PR status.
-        # If that's intended, it's fine.
-        if: github.ref == 'refs/heads/develop' # Example: only tag on pushes to develop
-        working-directory: dart_sdk # Ensure git commands run in the correct repository context
+      # Step 13: Create and push tag to joicodev/orion_gem_dart_client
+      - name: 🏷️ Create and push tag to SDK Repo
+        # Decide when to run this, e.g., only on pushes to the 'develop' branch of the workflow's repo
+        if: github.ref == 'refs/heads/develop' && (steps.create_pr.outputs.pull-request-operation == 'created' || steps.create_pr.outputs.pull-request-operation == 'updated')
+        working-directory: sdk_target_repo # Operate on the checked-out SDK target repo
+        env:
+          # The PAT is already available to git commands if it was used for checkout.
+          # If explicit authentication is needed for push (sometimes depends on git version/runner config):
+          # GIT_USER: github-actions[bot]
+          # GIT_PAT: ${{ secrets.SDK_REPO_PAT }}
+          TAG_NAME: "v${{ steps.get_version.outputs.version }}"
         run: |
-          TAG_NAME="v${{ steps.get_version.outputs.version }}"
-          echo "Attempting to create and push tag: $TAG_NAME"
-          # Check if tag already exists locally or remotely to avoid errors
-          if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
-            echo "Tag $TAG_NAME already exists locally."
+          echo "Attempting to create and push tag: $TAG_NAME to joicodev/orion_gem_dart_client"
+          git config user.name "github-actions[bot]" # Ensure git user is set
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Check if tag already exists remotely before trying to create/push
+          if git ls-remote --tags origin | grep -q "refs/tags/$TAG_NAME$"; then
+            echo "Tag $TAG_NAME already exists in the remote repository."
           else
             git tag "$TAG_NAME"
+            # The 'origin' here refers to joicodev/orion_gem_dart_client
             git push origin "$TAG_NAME"
-            echo "Tag $TAG_NAME created and pushed."
+            echo "Tag $TAG_NAME created and pushed to joicodev/orion_gem_dart_client."
           fi
