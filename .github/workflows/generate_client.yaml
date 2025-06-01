@@ -37,7 +37,7 @@ jobs:
       - name: 🧬 Clone Dart Client Repo
         uses: actions/checkout@v3
         with:
-          repository: joicodev/orion_gem_dart_client
+          repository: joicodev/orion_gem_nest_dart_client
           token: ${{ secrets.PAT_TOKEN }}
           path: dart_client
           # This checks out the default branch of the Dart client repository
