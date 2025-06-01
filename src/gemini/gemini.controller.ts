@@ -5,7 +5,7 @@ import { GeminiService } from './gemini.service';
 import { BasicPromptDto } from './dtos/basic-prompt.dot';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
-@ApiTags('Gemini Endpoints')
+@ApiTags('Gemini')
 @Controller('gemini')
 export class GeminiController {
   constructor(private readonly geminiService: GeminiService) {}
