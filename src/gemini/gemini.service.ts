@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { BasicPromptDto } from './dtos/basic-prompt.dot';
-import { GoogleGenAI } from '@google/genai';
+import { GenerateContentResponse, GoogleGenAI } from '@google/genai';
 import { basicPromptUseCase } from './use_cases/basic-prompt.use-case';
+import { basicPromptStreamUseCase } from './use_cases/basic-prompt-stream.use-case';
 
 @Injectable()
 export class GeminiService {
@@ -9,5 +10,11 @@ export class GeminiService {
 
   async basicPrompt(basicPromptDto: BasicPromptDto): Promise<string> {
     return await basicPromptUseCase(this.ai, basicPromptDto);
+  }
+
+  async basicPromptStream(
+    basicPromptDto: BasicPromptDto,
+  ): Promise<AsyncGenerator<GenerateContentResponse, any, any>> {
+    return await basicPromptStreamUseCase(this.ai, basicPromptDto);
   }
 }
