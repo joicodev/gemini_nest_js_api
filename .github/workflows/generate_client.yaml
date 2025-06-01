@@ -3,37 +3,30 @@ name: Generate Dart Client SDK
 on:
   push:
     branches:
-      - develop # Triggers the workflow on push events to the 'develop' branch
+      - develop # Triggers the workflow on push events to the 'develop' branch of the Nest API repo
 
 jobs:
   generate-client:
-    runs-on: ubuntu-latest # Specifies the runner environment
-    timeout-minutes: 20   # Sets a timeout for the job
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: 🧪 Checkout Nest API Repository
-        # Checks out the repository where the workflow is running (presumably the Nest API)
         uses: actions/checkout@v3
 
       - name: 🛠️ Setup Node.js
-        # Sets up a Node.js environment
         uses: actions/setup-node@v3
         with:
-          node-version: '20' # Specifies Node.js version 20
+          node-version: '20'
 
       - name: 🧩 Install API Dependencies
-        # Installs npm dependencies for the Nest API
         run: npm install
 
       - name: 🚀 Start Nest API in Background
-        # Starts the Nest API in development mode in the background
-        # nohup ensures the process continues running even if the shell session ends
-        # & runs the command in the background
         run: |
           nohup npm run start:dev &
 
       - name: ⏱️ Wait for Swagger to be Ready
-        # Waits until the Swagger/OpenAPI JSON endpoint is available
         run: |
           until curl --output /dev/null --silent --head --fail http://localhost:3000/api-json; do
             echo "Waiting for Swagger JSON endpoint at http://localhost:3000/api-json..."
@@ -42,66 +35,79 @@ jobs:
           echo "Swagger JSON endpoint is ready."
 
       - name: 🧬 Clone Dart Client Repo
-        # Checks out the Dart client repository into a 'dart_client' directory
         uses: actions/checkout@v3
         with:
-          repository: joicodev/orion_gem_dart_client # The repository to clone
-          token: ${{ secrets.PAT_TOKEN }}             # Token for accessing the repository
-          path: dart_client                           # Directory to clone into
+          repository: joicodev/orion_gem_dart_client
+          token: ${{ secrets.PAT_TOKEN }}
+          path: dart_client
+          # This checks out the default branch of the Dart client repository
 
-      - name: 🐹 Setup Dart
-        # Sets up a Dart SDK environment
-        uses: dart-lang/setup-dart@v1
-        # You can specify a Dart version if needed, e.g.:
-        # with:
-        #   sdk: 'stable' # or a specific version like '3.0.0'
-
-      - name: ⚙️ Install openapi-generator-cli
-        # Installs the OpenAPI Generator CLI globally via npm
-        run: npm install -g @openapitools/openapi-generator-cli
-
-      - name: ✅ Make client_generator.sh executable
-        # Makes the client generator script executable
-        working-directory: dart_client # Runs the command in the 'dart_client' directory
-        run: chmod +x client_generator.sh
-
-      - name: ⚙️ Run client_generator.sh
-        # Executes the client generator script
-        working-directory: dart_client # Runs the command in the 'dart_client' directory
-        run: ./client_generator.sh
-
-      - name: 📝 Commit & Push to auto/develop
-        # Configures git, commits, and pushes the generated changes to the Dart client repository
-        working-directory: dart_client # Runs all git commands in the 'dart_client' directory
+      - name: Setup Git and Target Branch in Dart Client Repo
+        working-directory: dart_client
+        env:
+          # Using PAT_TOKEN directly as it's clear. Ensure it has repo scope.
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
-
-          # Set the URL for the existing 'origin' remote to include the PAT for authentication
-          git remote set-url origin https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/joicodev/orion_gem_dart_client.git
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/joicodev/orion_gem_dart_client.git"
           
-          # Fetch the latest changes from the remote repository
-          git fetch origin
+          # Fetch the latest state from the remote, and remove any remote-tracking branches that no longer exist on the remote
+          git fetch origin --prune 
 
-          # Check if the 'auto/develop' branch exists on the remote
-          # If it exists, check it out and ensure it's tracking the remote branch, resetting any local changes
-          # If it doesn't exist, create it as a new local branch
-          if git ls-remote --exit-code --heads origin auto/develop; then
-            echo "Branch 'auto/develop' exists on remote. Checking out and resetting."
-            git checkout -B auto/develop origin/auto/develop
+          TARGET_BRANCH="auto/develop"
+          echo "Setting up target branch '$TARGET_BRANCH'..."
+
+          # Check if the remote branch 'auto/develop' exists
+          if git ls-remote --exit-code --heads origin "$TARGET_BRANCH"; then
+            echo "Remote branch '$TARGET_BRANCH' exists. Checking out and resetting local branch to it."
+            # If the branch exists on the remote, check it out.
+            # -B creates the branch if it doesn't exist locally, or resets it if it does.
+            # This ensures the working directory reflects the state of origin/auto/develop BEFORE generation.
+            git checkout -B "$TARGET_BRANCH" "origin/$TARGET_BRANCH"
           else
-            echo "Branch 'auto/develop' does not exist on remote. Creating new local branch."
-            git checkout -b auto/develop
+            echo "Remote branch '$TARGET_BRANCH' does not exist. Creating new local branch '$TARGET_BRANCH'."
+            # If the branch doesn't exist on remote, create a new local branch.
+            # This new branch will be based on the currently checked-out branch (default branch of client repo).
+            git checkout -b "$TARGET_BRANCH"
+          fi
+          echo "Successfully on branch '$TARGET_BRANCH'."
+          # Optional: list files to confirm state before generation
+          # ls -la
+
+      - name: 🐹 Setup Dart
+        uses: dart-lang/setup-dart@v1
+
+      - name: ⚙️ Install openapi-generator-cli
+        run: npm install -g @openapitools/openapi-generator-cli
+
+      - name: ✅ Make client_generator.sh executable
+        working-directory: dart_client
+        run: chmod +x client_generator.sh
+
+      - name: ⚙️ Run client_generator.sh
+        working-directory: dart_client # This runs on the prepared TARGET_BRANCH
+        run: ./client_generator.sh
+
+      - name: 📝 Commit & Push to auto/develop
+        working-directory: dart_client
+        run: |
+          # Git user/email and remote URL are already configured.
+          
+          TARGET_BRANCH="auto/develop"
+          # Double-check we are on the target branch (optional, good for safety)
+          CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+          if [ "$CURRENT_BRANCH" != "$TARGET_BRANCH" ]; then
+            echo "Error: Expected to be on branch '$TARGET_BRANCH', but on '$CURRENT_BRANCH'."
+            exit 1
           fi
 
-          # Stage all changes (new, modified, deleted files)
           git add .
-
-          # Check if there are any staged changes to commit
           if ! git diff --staged --quiet; then
-            echo "Changes detected. Committing and pushing..."
+            echo "Changes detected. Committing and pushing to '$TARGET_BRANCH'..."
             git commit -m "🔄 Auto-generated SDK update from Nest API"
-            git push origin auto/develop
+            # Use -u to set upstream for the first push or if not set.
+            git push -u origin "$TARGET_BRANCH"
           else
-            echo "No changes to commit."
+            echo "No changes to commit in '$TARGET_BRANCH'."
           fi
