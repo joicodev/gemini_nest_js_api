@@ -15,8 +15,8 @@ async function bootstrap() {
   );
 
   const config = new DocumentBuilder()
-    .setTitle('Gemini NestJS Backend')
-    .setDescription('Gemini NestJS Backend API description')
+    .setTitle('Orion Gemini NestJS Backend API')
+    .setDescription('Orion Gemini NestJS Backend API Description')
     .setVersion('1.0')
     .build();
 
