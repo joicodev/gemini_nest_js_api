@@ -50,7 +50,7 @@ jobs:
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
-          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/joicodev/orion_gem_dart_client.git"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/joicodev/orion_gem_nest_dart_client.git"
           
           # Fetch the latest state from the remote, and remove any remote-tracking branches that no longer exist on the remote
           git fetch origin --prune 
