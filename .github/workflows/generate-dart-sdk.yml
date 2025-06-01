@@ -4,89 +4,99 @@ on:
   push:
     branches:
       - develop
+  workflow_dispatch:
 
 jobs:
   generate-sdk:
     runs-on: ubuntu-latest
 
-    env:
-      SDK_REPO: joicodev/orion_gem_dart_client
-      SDK_REPO_CLONE_NAME: orion_gem_dart_client
-      SDK_OUTPUT_DIR: orion_gem_dart_client
-      NEST_API_URL: http://localhost:3000/api-json
-      PACKAGE_NAME: orion_gem_dart_client
-
     steps:
-      - name: ⬇️ Checkout backend repo
-        uses: actions/checkout@v4
-
-      - name: ⬇️ Checkout SDK repo
+      - name: ⬇️ Checkout Dart SDK repo
         uses: actions/checkout@v4
         with:
-          repository: ${{ env.SDK_REPO }}
-          path: ${{ env.SDK_OUTPUT_DIR }}
-          token: ${{ secrets.GITHUB_TOKEN }}
+          path: dart_sdk
 
-      - name: ⚙️ Install dependencies
+      - name: ⬇️ Checkout NestJS API repo
+        uses: actions/checkout@v4
+        with:
+          repository: joicodev/orion_gem_nest_api
+          path: backend
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 📦 Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: 🚀 Run NestJS API in background
+        working-directory: backend
+        run: |
+          npm run start:dev &
+          echo "⏳ Waiting for API to be ready..."
+          for i in {1..30}; do
+            if curl -s http://localhost:3000/api-json > /dev/null; then
+              echo "✅ API is up!"
+              break
+            fi
+            sleep 2
+          done
+
+      - name: 💾 Extract version from pubspec.yaml or default
+        id: get_version
+        working-directory: dart_sdk
+        run: |
+          VERSION=$(grep '^version:' pubspec.yaml | cut -d ' ' -f2 || echo "1.0.0")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: 🧹 Clean old SDK files
+        working-directory: dart_sdk
+        run: rm -rf lib doc test pubspec.yaml .openapi-generator .openapi-generator-ignore
+
+      - name: ⚙️ Generate Dart SDK
+        working-directory: dart_sdk
         run: |
           npm install -g @openapitools/openapi-generator-cli
-          sudo apt-get update
-          sudo apt-get install -y curl unzip
-
-      - name: 🧹 Clean old SDK
-        working-directory: ${{ env.SDK_OUTPUT_DIR }}
-        run: |
-          echo "🧹 Removing old generated files"
-          rm -rf lib doc test .openapi-generator .openapi-generator-ignore pubspec.yaml
-
-      - name: 🚀 Generate Dart SDK
-        run: |
           openapi-generator-cli generate \
             -g dart-dio \
-            -i ${{ env.NEST_API_URL }} \
-            -o ${{ env.SDK_OUTPUT_DIR }} \
-            --additional-properties=pubName=${{ env.PACKAGE_NAME }},serializationLibrary=built_value,buildRunner=true,useEnumExtension=true
+            -i http://localhost:3000/api-json \
+            -o . \
+            --additional-properties=pubName=orion_gem_dart_client,pubVersion=${{ steps.get_version.outputs.version }},serializationLibrary=built_value,buildRunner=true,useEnumExtension=true
 
-      - name: 📦 Bump patch version in pubspec.yaml
-        working-directory: ${{ env.SDK_OUTPUT_DIR }}
-        run: |
-          echo "📦 Reading current version from pubspec.yaml..."
-          VERSION_LINE=$(grep '^version:' pubspec.yaml)
-          CURRENT_VERSION=$(echo $VERSION_LINE | awk '{print $2}')
-          echo "🔍 Current version: $CURRENT_VERSION"
-
-          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
-          PATCH=$((PATCH + 1))
-          NEW_VERSION="$MAJOR.$MINOR.$PATCH"
-          echo "🚀 Bumping version to: $NEW_VERSION"
-
-          sed -i.bak "s/^version: .*/version: $NEW_VERSION/" pubspec.yaml
-          cat pubspec.yaml
-
-      - name: 🧪 (Optional) Run Dart codegen
-        working-directory: ${{ env.SDK_OUTPUT_DIR }}
+      - name: 🛠️ Run build_runner
+        working-directory: dart_sdk
         run: |
           dart pub get
-          dart run build_runner build --delete-conflicting-outputs || true
+          dart run build_runner build --delete-conflicting-outputs
 
-      - name: 📂 Create SDK commit
-        working-directory: ${{ env.SDK_OUTPUT_DIR }}
+      - name: 🆕 Create SDK branch
+        working-directory: dart_sdk
         run: |
           git config user.name "GitHub Action"
-          git config user.email "action@github.com"
-          BRANCH_NAME=sdk/update-$(date +%s)
-          git checkout -b $BRANCH_NAME
+          git config user.email "actions@github.com"
+          git checkout -b auto/sdk-update-${{ steps.get_version.outputs.version }}
           git add .
-          git commit -m "🤖 Auto-generated Dart SDK update"
-          git push origin $BRANCH_NAME
-          echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
+          git commit -m "🔄 Auto SDK update (v${{ steps.get_version.outputs.version }})"
+          git push origin auto/sdk-update-${{ steps.get_version.outputs.version }}
 
-      - name: 📬 Create PR to SDK repo
-        uses: peter-evans/create-pull-request@v6
+      - name: 🚀 Create Pull Request
+        uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: 🤖 Auto-generated Dart SDK update
-          branch: ${{ env.BRANCH_NAME }}
-          title: "SDK Update - Auto-generated"
+          path: dart_sdk
+          commit-message: "🔄 Auto SDK update (v${{ steps.get_version.outputs.version }})"
+          branch: auto/sdk-update-${{ steps.get_version.outputs.version }}
+          title: "SDK: Auto-generated update (v${{ steps.get_version.outputs.version }})"
+          body: |
+            This PR contains the auto-generated Dart client for Orion GEM API.
+            Version: `${{ steps.get_version.outputs.version }}`
+          labels: sdk, auto-generated
           base: main
-          path: ${{ env.SDK_OUTPUT_DIR }}
+
+      - name: 🏷️ Create tag
+        working-directory: dart_sdk
+        run: |
+          git tag v${{ steps.get_version.outputs.version }}
+          git push origin v${{ steps.get_version.outputs.version }}
