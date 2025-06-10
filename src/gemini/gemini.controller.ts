@@ -1,4 +1,4 @@
-import { Body, Controller, HttpStatus, Post, Res } from '@nestjs/common';
+import { Body, Controller, HttpStatus, Post, Res, StreamableFile } from '@nestjs/common';
 import { Response } from 'express';
 
 import { GeminiService } from './gemini.service';
@@ -8,7 +8,7 @@ import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 @ApiTags('Gemini')
 @Controller('gemini')
 export class GeminiController {
-  constructor(private readonly geminiService: GeminiService) {}
+  constructor(private readonly geminiService: GeminiService) { }
 
   @Post('basic-prompt')
   @ApiOperation({ summary: 'Basic prompt' })
@@ -27,6 +27,14 @@ export class GeminiController {
     status: HttpStatus.OK,
     description: 'The response from the basic prompt stream',
     type: String,
+    content: {
+      'text/plain': {
+        schema: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+    },
   })
   async basicPromptStream(
     @Body() basicPromptDto: BasicPromptDto,
