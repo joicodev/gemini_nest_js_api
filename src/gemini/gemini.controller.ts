@@ -1,5 +1,6 @@
 import { Body, Controller, HttpStatus, Post, Res, StreamableFile } from '@nestjs/common';
 import { Response } from 'express';
+import { Readable } from 'stream';
 
 import { GeminiService } from './gemini.service';
 import { BasicPromptDto } from './dtos/basic-prompt.dot';
@@ -26,7 +27,6 @@ export class GeminiController {
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'The response from the basic prompt stream',
-    type: String,
     content: {
       'text/plain': {
         schema: {
@@ -38,18 +38,37 @@ export class GeminiController {
   })
   async basicPromptStream(
     @Body() basicPromptDto: BasicPromptDto,
-    @Res() res: Response,
-  ): Promise<Response<string>> {
-    const stream = await this.geminiService.basicPromptStream(basicPromptDto);
-    res.setHeader('Content-Type', 'text/plain');
-    res.status(HttpStatus.OK);
-    for await (const chunk of stream) {
-      const piece = chunk.text;
-      console.log(piece);
-      res.write(piece);
-    }
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    const geminiStream = await this.geminiService.basicPromptStream(basicPromptDto);
 
-    res.end();
-    return res;
+    // Create a readable stream from the async generator
+    const nodeStream = new Readable({
+      read() {
+        // This will be handled by the async generator
+      }
+    });
+
+    // Set response headers
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Transfer-Encoding', 'chunked');
+    res.setHeader('Cache-Control', 'no-cache');
+
+    // Process the async generator in the background
+    (async () => {
+      try {
+        for await (const chunk of geminiStream) {
+          const piece = chunk.text;
+          console.log(piece);
+          nodeStream.push(piece);
+        }
+        nodeStream.push(null); // End the stream
+      } catch (error) {
+        console.error('Streaming error:', error);
+        nodeStream.destroy(error);
+      }
+    })();
+
+    return new StreamableFile(nodeStream);
   }
 }
