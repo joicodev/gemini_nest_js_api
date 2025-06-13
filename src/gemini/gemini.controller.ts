@@ -2,7 +2,7 @@ import { Body, Controller, HttpStatus, Post, Res } from '@nestjs/common';
 import { Response } from 'express';
 
 import { GeminiService } from './gemini.service';
-import { BasicPromptDto } from './dtos/basic-prompt.dot';
+import { BasicPromptDto } from './dtos/basic-prompt.dto';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 @ApiTags('Gemini')

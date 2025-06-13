@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { BasicPromptDto } from './dtos/basic-prompt.dot';
+import { BasicPromptDto } from './dtos/basic-prompt.dto';
 import { GenerateContentResponse, GoogleGenAI } from '@google/genai';
 import { basicPromptUseCase } from './use_cases/basic-prompt.use-case';
 import { basicPromptStreamUseCase } from './use_cases/basic-prompt-stream.use-case';
