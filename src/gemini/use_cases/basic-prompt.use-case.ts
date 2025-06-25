@@ -1,5 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
-import { BasicPromptDto } from '../dtos/basic-prompt.dot';
+import { BasicPromptDto } from '../dtos/basic-prompt.dto';
 
 interface Options {
   model?: string;
