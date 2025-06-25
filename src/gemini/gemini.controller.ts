@@ -1,4 +1,4 @@
-import { Body, Controller, HttpStatus, Post, Res } from '@nestjs/common';
+import { Body, Controller, HttpStatus, Post, Res, StreamableFile } from '@nestjs/common';
 import { Response } from 'express';
 import { Readable } from 'stream';
 
