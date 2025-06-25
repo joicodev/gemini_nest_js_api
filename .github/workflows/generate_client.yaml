@@ -1,0 +1,113 @@
+name: Generate Dart Client SDK
+
+on:
+  push:
+    branches:
+      - develop # Triggers the workflow on push events to the 'develop' branch of the Nest API repo
+
+jobs:
+  generate-client:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: 🧪 Checkout Nest API Repository
+        uses: actions/checkout@v3
+
+      - name: 🛠️ Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: 🧩 Install API Dependencies
+        run: npm install
+
+      - name: 🚀 Start Nest API in Background
+        run: |
+          nohup npm run start:dev &
+
+      - name: ⏱️ Wait for Swagger to be Ready
+        run: |
+          until curl --output /dev/null --silent --head --fail http://localhost:3000/api-json; do
+            echo "Waiting for Swagger JSON endpoint at http://localhost:3000/api-json..."
+            sleep 5
+          done
+          echo "Swagger JSON endpoint is ready."
+
+      - name: 🧬 Clone Dart Client Repo
+        uses: actions/checkout@v3
+        with:
+          repository: joicodev/orion_gem_nest_dart_client
+          token: ${{ secrets.PAT_TOKEN }}
+          path: dart_client
+          # This checks out the default branch of the Dart client repository
+
+      - name: Setup Git and Target Branch in Dart Client Repo
+        working-directory: dart_client
+        env:
+          # Using PAT_TOKEN directly as it's clear. Ensure it has repo scope.
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/joicodev/orion_gem_nest_dart_client.git"
+          
+          # Fetch the latest state from the remote, and remove any remote-tracking branches that no longer exist on the remote
+          git fetch origin --prune 
+
+          TARGET_BRANCH="auto/develop"
+          echo "Setting up target branch '$TARGET_BRANCH'..."
+
+          # Check if the remote branch 'auto/develop' exists
+          if git ls-remote --exit-code --heads origin "$TARGET_BRANCH"; then
+            echo "Remote branch '$TARGET_BRANCH' exists. Checking out and resetting local branch to it."
+            # If the branch exists on the remote, check it out.
+            # -B creates the branch if it doesn't exist locally, or resets it if it does.
+            # This ensures the working directory reflects the state of origin/auto/develop BEFORE generation.
+            git checkout -B "$TARGET_BRANCH" "origin/$TARGET_BRANCH"
+          else
+            echo "Remote branch '$TARGET_BRANCH' does not exist. Creating new local branch '$TARGET_BRANCH'."
+            # If the branch doesn't exist on remote, create a new local branch.
+            # This new branch will be based on the currently checked-out branch (default branch of client repo).
+            git checkout -b "$TARGET_BRANCH"
+          fi
+          echo "Successfully on branch '$TARGET_BRANCH'."
+          # Optional: list files to confirm state before generation
+          # ls -la
+
+      - name: 🐹 Setup Dart
+        uses: dart-lang/setup-dart@v1
+
+      - name: ⚙️ Install openapi-generator-cli
+        run: npm install -g @openapitools/openapi-generator-cli
+
+      - name: ✅ Make client_generator.sh executable
+        working-directory: dart_client
+        run: chmod +x client_generator.sh
+
+      - name: ⚙️ Run client_generator.sh
+        working-directory: dart_client # This runs on the prepared TARGET_BRANCH
+        run: ./client_generator.sh
+
+      - name: 📝 Commit & Push to auto/develop
+        working-directory: dart_client
+        run: |
+          # Git user/email and remote URL are already configured.
+          
+          TARGET_BRANCH="auto/develop"
+          # Double-check we are on the target branch (optional, good for safety)
+          CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+          if [ "$CURRENT_BRANCH" != "$TARGET_BRANCH" ]; then
+            echo "Error: Expected to be on branch '$TARGET_BRANCH', but on '$CURRENT_BRANCH'."
+            exit 1
+          fi
+
+          git add .
+          if ! git diff --staged --quiet; then
+            echo "Changes detected. Committing and pushing to '$TARGET_BRANCH'..."
+            git commit -m "🔄 Auto-generated SDK update from Nest API"
+            # Use -u to set upstream for the first push or if not set.
+            git push -u origin "$TARGET_BRANCH"
+          else
+            echo "No changes to commit in '$TARGET_BRANCH'."
+          fi
