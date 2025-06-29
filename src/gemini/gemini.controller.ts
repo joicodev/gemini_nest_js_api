@@ -1,9 +1,11 @@
-import { Body, Controller, HttpStatus, Post, Res } from '@nestjs/common';
+import { Body, Controller, HttpStatus, Post, Res, UploadedFiles, UseInterceptors} from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+
 import { Response } from 'express';
 
 import { GeminiService } from './gemini.service';
 import { BasicPromptDto } from './dtos/basic-prompt.dto';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 @ApiTags('Gemini')
 @Controller('gemini')
@@ -28,15 +30,8 @@ export class GeminiController {
     return this.geminiService.basicPrompt(basicPromptDto);
   }
 
-  /**
-   * @description
-   * Basic prompt stream
-   *
-   * @param {BasicPromptDto} basicPromptDto
-   * @param {Response} res
-   * @returns {Promise<Response<string>>}
-   */
-  @Post('basic-prompt-stream')
+
+  /* @Post('basic-prompt-stream')
   @ApiOperation({ summary: 'Basic prompt stream' })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -55,6 +50,48 @@ export class GeminiController {
     @Body() basicPromptDto: BasicPromptDto,
     @Res() res: Response,
   ): Promise<Response<string>> {
+    const stream = await this.geminiService.basicPromptStream(basicPromptDto);
+    res.setHeader('Content-Type', 'text/plain');
+    res.status(HttpStatus.OK);
+    for await (const chunk of stream) {
+      const piece = chunk.text;
+      console.log(piece);
+      res.write(piece);
+    }
+
+    res.end();
+    return res;
+  } */
+
+  /**
+   * 
+   * @param basicPromptDto 
+   * @param res 
+   * @param file 
+   * @returns 
+   */
+  @Post('basic-prompt-stream')
+  @UseInterceptors(FilesInterceptor('files'))
+  @ApiOperation({ summary: 'Basic prompt stream' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'The response from the basic prompt stream',
+    type: String,
+    content: {
+      'text/plain': {
+        schema: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+    },
+  })
+  async basicPromptAssetsStream(
+    @Body() basicPromptDto: BasicPromptDto,
+    @Res() res: Response,
+    @UploadedFiles() files: Express.Multer.File[]
+  ): Promise<Response<string>> {
+    basicPromptDto.files = files;
     const stream = await this.geminiService.basicPromptStream(basicPromptDto);
     res.setHeader('Content-Type', 'text/plain');
     res.status(HttpStatus.OK);
