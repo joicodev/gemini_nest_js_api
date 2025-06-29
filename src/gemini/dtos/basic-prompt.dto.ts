@@ -1,6 +1,5 @@
 import { IsArray, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-
 export class BasicPromptDto {
   @IsString()
   @IsNotEmpty()
@@ -11,16 +10,15 @@ export class BasicPromptDto {
   prompt: string;
 
   @ApiProperty({
-    example: [],
     description: 'Array of files to be sent with the prompt',
     type: 'array',
     items: {
       type: 'string',
-      format: 'binary'
+      format: 'binary',
     },
     required: false,
   })
   @IsArray()
   @IsOptional()
-  files: Express.Multer.File[];
+  files?: Express.Multer.File[];
 }
