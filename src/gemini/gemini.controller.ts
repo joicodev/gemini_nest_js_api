@@ -1,10 +1,11 @@
-import { Body, Controller, HttpStatus, Post, Res, StreamableFile } from '@nestjs/common';
+import { Body, Controller, HttpStatus, Post, Res, UploadedFiles, UseInterceptors} from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+
 import { Response } from 'express';
-import { Readable } from 'stream';
 
 import { GeminiService } from './gemini.service';
 import { BasicPromptDto } from './dtos/basic-prompt.dto';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 @ApiTags('Gemini')
 @Controller('gemini')
@@ -29,19 +30,13 @@ export class GeminiController {
     return this.geminiService.basicPrompt(basicPromptDto);
   }
 
-  /**
-   * @description
-   * Basic prompt stream
-   *
-   * @param {BasicPromptDto} basicPromptDto
-   * @param {Response} res
-   * @returns {Promise<Response<string>>}
-   */
-  @Post('basic-prompt-stream')
+
+  /* @Post('basic-prompt-stream')
   @ApiOperation({ summary: 'Basic prompt stream' })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'The response from the basic prompt stream',
+    type: String,
     content: {
       'text/plain': {
         schema: {
@@ -53,37 +48,60 @@ export class GeminiController {
   })
   async basicPromptStream(
     @Body() basicPromptDto: BasicPromptDto,
-    @Res({ passthrough: true }) res: Response,
-  ): Promise<StreamableFile> {
-    const geminiStream = await this.geminiService.basicPromptStream(basicPromptDto);
+    @Res() res: Response,
+  ): Promise<Response<string>> {
+    const stream = await this.geminiService.basicPromptStream(basicPromptDto);
+    res.setHeader('Content-Type', 'text/plain');
+    res.status(HttpStatus.OK);
+    for await (const chunk of stream) {
+      const piece = chunk.text;
+      console.log(piece);
+      res.write(piece);
+    }
 
-    // Create a readable stream from the async generator
-    const nodeStream = new Readable({
-      read() {
-        // This will be handled by the async generator
-      }
-    });
+    res.end();
+    return res;
+  } */
 
-    // Set response headers
-    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-    res.setHeader('Transfer-Encoding', 'chunked');
-    res.setHeader('Cache-Control', 'no-cache');
+  /**
+   * 
+   * @param basicPromptDto 
+   * @param res 
+   * @param file 
+   * @returns 
+   */
+  @Post('basic-prompt-stream')
+  @UseInterceptors(FilesInterceptor('files'))
+  @ApiOperation({ summary: 'Basic prompt stream' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'The response from the basic prompt stream',
+    type: String,
+    content: {
+      'text/plain': {
+        schema: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+    },
+  })
+  async basicPromptAssetsStream(
+    @Body() basicPromptDto: BasicPromptDto,
+    @Res() res: Response,
+    @UploadedFiles() files: Express.Multer.File[]
+  ): Promise<Response<string>> {
+    basicPromptDto.files = files;
+    const stream = await this.geminiService.basicPromptStream(basicPromptDto);
+    res.setHeader('Content-Type', 'text/plain');
+    res.status(HttpStatus.OK);
+    for await (const chunk of stream) {
+      const piece = chunk.text;
+      console.log(piece);
+      res.write(piece);
+    }
 
-    // Process the async generator in the background
-    (async () => {
-      try {
-        for await (const chunk of geminiStream) {
-          const piece = chunk.text;
-          console.log(piece);
-          nodeStream.push(piece);
-        }
-        nodeStream.push(null); // End the stream
-      } catch (error) {
-        console.error('Streaming error:', error);
-        nodeStream.destroy(error);
-      }
-    })();
-
-    return new StreamableFile(nodeStream);
+    res.end();
+    return res;
   }
 }

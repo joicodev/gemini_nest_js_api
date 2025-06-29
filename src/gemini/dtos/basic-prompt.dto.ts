@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString } from 'class-validator';
+import { IsArray, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 export class BasicPromptDto {
   @IsString()
@@ -8,4 +8,14 @@ export class BasicPromptDto {
     description: 'The prompt to be sent to the Gemini API',
   })
   prompt: string;
+
+  @ApiProperty({
+    example: [],
+    description: 'Array of files to be sent with the prompt',
+    type: [String],
+    required: false,
+  })
+  @IsArray()
+  @IsOptional()
+  files: Express.Multer.File[];
 }
