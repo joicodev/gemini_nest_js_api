@@ -1,6 +1,6 @@
 import { Body, Controller, HttpStatus, Post, Res, UploadedFiles, UseInterceptors} from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
-import { ApiConsumes, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiConsumes, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 import { Response } from 'express';
 
@@ -72,6 +72,7 @@ export class GeminiController {
    */
   @Post('basic-prompt-stream')
   @UseInterceptors(FilesInterceptor('files'))
+  @ApiBody({ type: BasicPromptDto })  
   @ApiConsumes('multipart/form-data') 
   @ApiOperation({ summary: 'Basic prompt stream' })
   @ApiResponse({
