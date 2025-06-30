@@ -1,6 +1,6 @@
 import { Body, Controller, HttpStatus, Post, Res, UploadedFiles, UseInterceptors} from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
-import { ApiBody, ApiConsumes, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiConsumes, ApiOperation, ApiProduces, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 import { Response } from 'express';
 
@@ -30,55 +30,22 @@ export class GeminiController {
     return this.geminiService.basicPrompt(basicPromptDto);
   }
 
-
-  /* @Post('basic-prompt-stream')
-  @ApiOperation({ summary: 'Basic prompt stream' })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'The response from the basic prompt stream',
-    type: String,
-    content: {
-      'text/plain': {
-        schema: {
-          type: 'string',
-          format: 'binary',
-        },
-      },
-    },
-  })
-  async basicPromptStream(
-    @Body() basicPromptDto: BasicPromptDto,
-    @Res() res: Response,
-  ): Promise<Response<string>> {
-    const stream = await this.geminiService.basicPromptStream(basicPromptDto);
-    res.setHeader('Content-Type', 'text/plain');
-    res.status(HttpStatus.OK);
-    for await (const chunk of stream) {
-      const piece = chunk.text;
-      console.log(piece);
-      res.write(piece);
-    }
-
-    res.end();
-    return res;
-  } */
-
   /**
-   * 
+   * Basic prompt stream with file upload support
    * @param basicPromptDto 
    * @param res 
-   * @param file 
+   * @param files 
    * @returns 
    */
   @Post('basic-prompt-stream')
-  @UseInterceptors(FilesInterceptor('files'))
   @ApiBody({ type: BasicPromptDto })  
-  @ApiConsumes('multipart/form-data') 
-  @ApiOperation({ summary: 'Basic prompt stream' })
+  @UseInterceptors(FilesInterceptor('files'))
+  @ApiConsumes('multipart/form-data')
+  @ApiProduces('application/octet-stream')
+  @ApiOperation({ summary: 'Basic prompt stream with file upload' })
   @ApiResponse({
     status: HttpStatus.OK,
-    description: 'The response from the basic prompt stream',
-    type: String,
+    description: 'Streaming response from the basic prompt',
     content: {
       'text/plain': {
         schema: {
@@ -92,7 +59,7 @@ export class GeminiController {
     @Body() basicPromptDto: BasicPromptDto,
     @Res() res: Response,
     @UploadedFiles() files: Express.Multer.File[]
-  ): Promise<Response<string>> {
+  ): Promise<void> { 
     basicPromptDto.files = files;
     const stream = await this.geminiService.basicPromptStream(basicPromptDto);
     res.setHeader('Content-Type', 'text/plain');
@@ -104,6 +71,5 @@ export class GeminiController {
     }
 
     res.end();
-    return res;
   }
 }
