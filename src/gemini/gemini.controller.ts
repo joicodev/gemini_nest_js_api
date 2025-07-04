@@ -45,12 +45,11 @@ export class GeminiController {
   @ApiOperation({ summary: 'Basic prompt stream with file upload' })
   @ApiResponse({
     status: HttpStatus.OK,
-    description: 'Streaming response from the basic prompt',
+    description: 'Streaming text response from the basic prompt',
     content: {
       'text/plain': {
         schema: {
           type: 'string',
-          format: 'binary',
         },
       },
     },

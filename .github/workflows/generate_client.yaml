@@ -51,7 +51,7 @@ jobs:
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
           git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/joicodev/orion_gem_nest_dart_client.git"
-          
+
           # Fetch the latest state from the remote, and remove any remote-tracking branches that no longer exist on the remote
           git fetch origin --prune 
 
@@ -81,19 +81,24 @@ jobs:
       - name: ⚙️ Install openapi-generator-cli
         run: npm install -g @openapitools/openapi-generator-cli
 
-      - name: ✅ Make client_generator.sh executable
-        working-directory: dart_client
-        run: chmod +x client_generator.sh
+      # - name: ✅ Make client_generator.sh executable
+      #   working-directory: dart_client
+      #   run: chmod +x client_generator.sh
 
-      - name: ⚙️ Run client_generator.sh
-        working-directory: dart_client # This runs on the prepared TARGET_BRANCH
-        run: ./client_generator.sh
+      # - name: ⚙️ Run client_generator.sh
+      #   working-directory: dart_client # This runs on the prepared TARGET_BRANCH
+      #   run: ./client_generator.sh
+
+      # Makefile-based SDK generation (uses 'make all' for full process)
+      - name: ⚙️ Run Makefile to generate Dart SDK
+        working-directory: dart_client
+        run: make all
 
       - name: 📝 Commit & Push to auto/develop
         working-directory: dart_client
         run: |
           # Git user/email and remote URL are already configured.
-          
+
           TARGET_BRANCH="auto/develop"
           # Double-check we are on the target branch (optional, good for safety)
           CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
