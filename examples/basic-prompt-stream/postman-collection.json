@@ -1,0 +1,220 @@
+{
+  "info": {
+    "name": "Orion Gemini API - Basic Prompt Stream",
+    "description": "Collection for testing the basic-prompt-stream endpoint with file uploads",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Basic Prompt Stream - Text File",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "text/plain"
+          }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "prompt",
+              "value": "Analyze this text file and summarize its content",
+              "type": "text"
+            },
+            {
+              "key": "files",
+              "type": "file",
+              "src": "/path/to/test_file.txt"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/gemini/basic-prompt-stream",
+          "host": ["{{baseUrl}}"],
+          "path": ["gemini", "basic-prompt-stream"]
+        },
+        "description": "Stream response with text file upload"
+      },
+      "response": []
+    },
+    {
+      "name": "Basic Prompt Stream - Multiple Files",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "text/plain"
+          }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "prompt",
+              "value": "Compare and analyze these two text files",
+              "type": "text"
+            },
+            {
+              "key": "files",
+              "type": "file",
+              "src": "/path/to/test_file1.txt"
+            },
+            {
+              "key": "files",
+              "type": "file",
+              "src": "/path/to/test_file2.txt"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/gemini/basic-prompt-stream",
+          "host": ["{{baseUrl}}"],
+          "path": ["gemini", "basic-prompt-stream"]
+        },
+        "description": "Stream response with multiple file uploads"
+      },
+      "response": []
+    },
+    {
+      "name": "Basic Prompt Stream - Text Only",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "text/plain"
+          }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "prompt",
+              "value": "Write a detailed explanation of machine learning algorithms",
+              "type": "text"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/gemini/basic-prompt-stream",
+          "host": ["{{baseUrl}}"],
+          "path": ["gemini", "basic-prompt-stream"]
+        },
+        "description": "Stream response without file uploads"
+      },
+      "response": []
+    },
+    {
+      "name": "Basic Prompt Stream - Image File",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "text/plain"
+          }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "prompt",
+              "value": "Describe what you see in this image",
+              "type": "text"
+            },
+            {
+              "key": "files",
+              "type": "file",
+              "src": "/path/to/test_image.jpg"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/gemini/basic-prompt-stream",
+          "host": ["{{baseUrl}}"],
+          "path": ["gemini", "basic-prompt-stream"]
+        },
+        "description": "Stream response with image file upload"
+      },
+      "response": []
+    },
+    {
+      "name": "Basic Prompt Stream - Error: Empty Prompt",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "text/plain"
+          }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "prompt",
+              "value": "",
+              "type": "text"
+            },
+            {
+              "key": "files",
+              "type": "file",
+              "src": "/path/to/test_file.txt"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/gemini/basic-prompt-stream",
+          "host": ["{{baseUrl}}"],
+          "path": ["gemini", "basic-prompt-stream"]
+        },
+        "description": "Test error handling with empty prompt"
+      },
+      "response": []
+    },
+    {
+      "name": "Basic Prompt Stream - Error: Non-existent File",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "text/plain"
+          }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "prompt",
+              "value": "Analyze this file",
+              "type": "text"
+            },
+            {
+              "key": "files",
+              "type": "file",
+              "src": "/path/to/non_existent_file.txt"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/gemini/basic-prompt-stream",
+          "host": ["{{baseUrl}}"],
+          "path": ["gemini", "basic-prompt-stream"]
+        },
+        "description": "Test error handling with non-existent file"
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    }
+  ]
+} 

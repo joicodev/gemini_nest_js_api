@@ -1,0 +1,154 @@
+{
+  "info": {
+    "name": "Orion Gemini API - Awesome Prompt",
+    "description": "Collection for testing the awesome-prompt endpoint",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Awesome Prompt - Simple Prompt",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"prompt\": \"Tell me about AI\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/gemini/awesome-prompt",
+          "host": ["{{baseUrl}}"],
+          "path": ["gemini", "awesome-prompt"]
+        },
+        "description": "Improve a simple prompt about AI"
+      },
+      "response": []
+    },
+    {
+      "name": "Awesome Prompt - Vague Prompt",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"prompt\": \"Write something about technology\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/gemini/awesome-prompt",
+          "host": ["{{baseUrl}}"],
+          "path": ["gemini", "awesome-prompt"]
+        },
+        "description": "Improve a vague prompt about technology"
+      },
+      "response": []
+    },
+    {
+      "name": "Awesome Prompt - Technical Prompt",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"prompt\": \"How to make a website\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/gemini/awesome-prompt",
+          "host": ["{{baseUrl}}"],
+          "path": ["gemini", "awesome-prompt"]
+        },
+        "description": "Improve a technical prompt about website creation"
+      },
+      "response": []
+    },
+    {
+      "name": "Awesome Prompt - Creative Prompt",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"prompt\": \"Write a story\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/gemini/awesome-prompt",
+          "host": ["{{baseUrl}}"],
+          "path": ["gemini", "awesome-prompt"]
+        },
+        "description": "Improve a creative writing prompt"
+      },
+      "response": []
+    },
+    {
+      "name": "Awesome Prompt - Business Prompt",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"prompt\": \"Marketing strategy\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/gemini/awesome-prompt",
+          "host": ["{{baseUrl}}"],
+          "path": ["gemini", "awesome-prompt"]
+        },
+        "description": "Improve a business-related prompt"
+      },
+      "response": []
+    },
+    {
+      "name": "Awesome Prompt - Error: Empty Prompt",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"prompt\": \"\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/gemini/awesome-prompt",
+          "host": ["{{baseUrl}}"],
+          "path": ["gemini", "awesome-prompt"]
+        },
+        "description": "Test error handling with empty prompt"
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    }
+  ]
+} 

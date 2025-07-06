@@ -1,0 +1,131 @@
+{
+  "info": {
+    "name": "Orion Gemini API - Basic Prompt",
+    "description": "Collection for testing the basic-prompt endpoint",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Basic Prompt - Simple Text",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"prompt\": \"Explain quantum computing in simple terms\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/gemini/basic-prompt",
+          "host": ["{{baseUrl}}"],
+          "path": ["gemini", "basic-prompt"]
+        },
+        "description": "Simple text prompt to test basic functionality"
+      },
+      "response": []
+    },
+    {
+      "name": "Basic Prompt - Creative Writing",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"prompt\": \"Write a short story about a robot learning to paint\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/gemini/basic-prompt",
+          "host": ["{{baseUrl}}"],
+          "path": ["gemini", "basic-prompt"]
+        },
+        "description": "Creative writing prompt to test AI creativity"
+      },
+      "response": []
+    },
+    {
+      "name": "Basic Prompt - Code Explanation",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"prompt\": \"Explain what this code does: function fibonacci(n) { return n <= 1 ? n : fibonacci(n-1) + fibonacci(n-2); }\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/gemini/basic-prompt",
+          "host": ["{{baseUrl}}"],
+          "path": ["gemini", "basic-prompt"]
+        },
+        "description": "Code explanation prompt to test technical understanding"
+      },
+      "response": []
+    },
+    {
+      "name": "Basic Prompt - Error: Empty Prompt",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"prompt\": \"\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/gemini/basic-prompt",
+          "host": ["{{baseUrl}}"],
+          "path": ["gemini", "basic-prompt"]
+        },
+        "description": "Test error handling with empty prompt"
+      },
+      "response": []
+    },
+    {
+      "name": "Basic Prompt - Error: Missing Prompt",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"message\": \"This should fail\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/gemini/basic-prompt",
+          "host": ["{{baseUrl}}"],
+          "path": ["gemini", "basic-prompt"]
+        },
+        "description": "Test error handling with missing prompt field"
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    }
+  ]
+} 
