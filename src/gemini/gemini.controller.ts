@@ -31,6 +31,24 @@ export class GeminiController {
   }
 
   /**
+   * @description
+   * Awesome prompt - improves the given prompt
+   *
+   * @param {BasicPromptDto} basicPromptDto
+   * @returns {Promise<string>}
+   */
+  @Post('awesome-prompt')
+  @ApiOperation({ summary: 'Awesome prompt - improves the given prompt' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'The improved prompt response',
+    type: String,
+  })
+  awesomePrompt(@Body() basicPromptDto: BasicPromptDto): Promise<string> {
+    return this.geminiService.awesomePrompt(basicPromptDto);
+  }
+
+  /**
    * Basic prompt stream with file upload support
    * @param basicPromptDto 
    * @param res 
