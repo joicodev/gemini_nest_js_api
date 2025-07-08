@@ -30,6 +30,22 @@ export class GeminiController {
     return this.geminiService.basicPrompt(basicPromptDto);
   }
 
+  @Post('basic-prompt-assets')
+  @UseInterceptors(FilesInterceptor('files'))
+  @ApiOperation({ summary: 'Basic prompt with assets' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'The response from the basic prompt with assets',
+    type: String,
+  })
+  async basicPromptAssets(
+    @Body() basicPromptDto: BasicPromptDto,
+    @UploadedFiles() files: Express.Multer.File[],
+  ): Promise<string> {
+    basicPromptDto.files = files;
+    return this.geminiService.basicPromptAssets(basicPromptDto);
+  }
+
 
   /* @Post('basic-prompt-stream')
   @ApiOperation({ summary: 'Basic prompt stream' })

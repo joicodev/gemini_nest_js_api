@@ -2,12 +2,14 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { GeminiService } from '../src/gemini/gemini.service';
 import { basicPromptUseCase } from '../src/gemini/use_cases/basic-prompt.use-case';
 import { basicPromptStreamUseCase } from '../src/gemini/use_cases/basic-prompt-stream.use-case';
+import { basicPromptAssetsUseCase } from '../src/gemini/use_cases/basic-prompt-assets.use-case';
 import { BasicPromptDto } from '../src/gemini/dtos/basic-prompt.dto';
 import { GoogleGenAI } from '@google/genai';
 
 // Mock the use cases
 jest.mock('../src/gemini/use_cases/basic-prompt.use-case');
 jest.mock('../src/gemini/use_cases/basic-prompt-stream.use-case');
+jest.mock('../src/gemini/use_cases/basic-prompt-assets.use-case');
 
 describe('GeminiService', () => {
   let service: GeminiService;
@@ -64,6 +66,22 @@ describe('GeminiService', () => {
         basicPromptDto,
       );
       expect(result).toBe(mockStream);
+    });
+  });
+
+  describe('basicPromptAssets', () => {
+    it('should call basicPromptAssetsUseCase with the correct parameters', async () => {
+      const basicPromptDto: BasicPromptDto = { prompt: 'Hello assets', files: [] };
+      const expectedResult = 'Response with assets';
+      (basicPromptAssetsUseCase as jest.Mock).mockResolvedValue(expectedResult);
+
+      const result = await service.basicPromptAssets(basicPromptDto);
+
+      expect(basicPromptAssetsUseCase).toHaveBeenCalledWith(
+        expect.any(GoogleGenAI),
+        basicPromptDto,
+      );
+      expect(result).toBe(expectedResult);
     });
   });
 });
